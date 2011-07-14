@@ -1,0 +1,179 @@
+<html>
+	<head>
+    <title>Descent Zero</title>
+
+
+  </head>
+
+  <body bgcolor="#000000">
+    <script type="text/javascript" src="ship.js"></script>
+    <script type="text/javascript" src="controls.js"></script>
+    <script type="text/javascript" src="laser.js"></script>
+    <script type="text/javascript" src="drone.js"></script>
+    <script type="text/javascript" src="particles.js"></script>
+
+    <script type="text/javascript">
+    // requestAnim shim layer by Paul Irish
+    window.requestAnimFrame = (function(){
+        return  window.requestAnimationFrame       || 
+                window.webkitRequestAnimationFrame || 
+                window.mozRequestAnimationFrame    || 
+                window.oRequestAnimationFrame      || 
+                window.msRequestAnimationFrame     || 
+                function(/* function */ callback, /* DOMElement */ element){
+                  window.setTimeout(callback, 1000 / 60);
+                };
+        })();
+
+      var canvas, context;
+
+      var ship;
+      var drone;
+      var controls;
+
+      var lasers;
+      var dronelasers;
+      var particles;
+
+      var lastDraw;
+
+      var e;
+
+      init();
+      animate();
+
+      function init() {
+        canvas = document.createElement('canvas');
+        canvas.width = 512;
+        canvas.height = 512;
+
+        context = canvas.getContext('2d');
+
+        document.body.appendChild(canvas);
+
+        context.fillStyle = 'rgb(0,0,0)';
+        context.fillRect(0,0,512,512);
+
+        lastDraw = new Date().getTime();
+
+        ship = new Ship();
+        drone = new Class1Drone(100,100,0,ship);
+        controls = new Controls(ship);
+        lasers = [];
+        particles = [];
+        dronelasers = [];
+
+        ship.lasers = lasers;
+
+        e = new Explosion(300,300);
+
+        document.addEventListener( 'keydown', controls.keyDown, false);
+        document.addEventListener( 'keyup', controls.keyUp, false);
+      }
+
+      function animate() {
+        requestAnimFrame( animate );
+        draw();
+      }
+
+      function draw() {
+
+        context.fillStyle = 'rgb(0,0,0)';
+        context.strokeStyle = 'rgb(32,32,32)';
+        context.lineWidth = 2;
+        context.fillRect(0,0,512,512);
+        context.strokeRect(0,0,512,512);
+        
+        var timeNow = new Date().getTime();
+        var timeSinceLastFrame = timeNow - lastDraw;
+        lastDraw = timeNow;
+
+        ship.update(timeSinceLastFrame);
+        ship.draw(context);
+
+        drone.update(timeSinceLastFrame, dronelasers);
+        drone.draw(context);
+
+        for(var i=0; i < lasers.length; i++) {
+          lasers[i].update(timeSinceLastFrame);
+
+
+          if( ! drone.dead &&
+              Math.sqrt((lasers[i].x - drone.x)*(lasers[i].x - drone.x) + 
+                        (lasers[i].y - drone.y)*(lasers[i].y - drone.y)) < drone.radius + lasers[i].hitRadius) {
+
+            if(lasers[i].fusion) {
+              var dmg = lasers[i].getDamage(drone);
+              if(dmg > 0) drone.takeHit(dmg);
+
+              lasers[i].draw(context);
+
+              particles.push(new Spark(lasers[i].x, lasers[i].y));
+            } else {
+              drone.takeHit(lasers[i].damage);
+              lasers[i].dead = true;
+            }
+          } else {
+            lasers[i].draw(context);
+          }
+
+          if(lasers[i].dead) {
+            particles.push(new Spark(lasers[i].x, lasers[i].y));
+          }
+        }
+
+
+        for(var i=0; i < dronelasers.length; i++) {
+          dronelasers[i].update(timeSinceLastFrame);
+
+          var dx = dronelasers[i].x;
+          var dy = dronelasers[i].y;
+
+          var sx = ship.posx;
+          var sy = ship.posy;
+          if(!(ship.dead) && Math.sqrt((dx - sx)*(dx - sx) + (dy - sy)*(dy-sy)) < ship.radius + dronelasers[i].hitRadius) {
+            ship.takeHit(dronelasers[i].damage);
+            dronelasers[i].dead = true;
+          }
+
+          if(dronelasers[i].dead) {
+            particles.push(new Spark(dronelasers[i].x, dronelasers[i].y));
+          } else {
+            dronelasers[i].draw(context);
+          }
+        }
+
+        if(ship.dead && ! ship.exploded) {
+          particles.push(new Explosion(ship.posx, ship.posy));
+          ship.exploded = true;
+        }
+
+        if(drone.dead && ! drone.exploded) {
+          particles.push(new Explosion(drone.x, drone.y));
+          drone.exploded = true;
+        }
+
+        for(i = 0; i < particles.length; i++) {
+          particles[i].update(timeSinceLastFrame);
+          particles[i].draw(context);
+        }
+
+        removeDead();
+      }
+
+      function removeDead() {
+        lasers = lasers.filter(function (elem, index, array) { return ! elem.dead });
+        ship.lasers = lasers;
+
+        particles = particles.filter(function (elem, index, array) { return ! elem.dead });
+
+        dronelasers = dronelasers.filter(function (elem, index, array) { return ! elem.dead });
+      }
+ 
+
+
+
+
+    </script>
+  </body>
+</html>
